@@ -10,13 +10,12 @@ class DesktopSteps:
     Actions to take to get E2B desktop to a reproducible state. 
     """
 
-    def __init__(self,
-                 desktop: "Sandbox"):
+    def __init__(self):
         
         self.steps = []
 
 
-    def run():
+    def run(desktop: "Sandbox"):
         ...
 
 
