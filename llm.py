@@ -26,25 +26,27 @@ class BaseFunction(ABC):
 
 
 
-
 class OpenAIModel:
     """
     Communicates with the OpenAI Api
+
+    :param tools: Dict avaliable tools. Example: \
+    tools = {
+            "execute_python": ExecutePythonFunction(robot),
+            "move": MoveFunction(robot),
+            "speak": SpeakFunction(robot)
+            }
     """
-    def __init__(self):
-        self.model = "gpt-4o-mini"
+    def __init__(self, 
+                 tools: Dict[str, BaseFunction] = {}):
+        self.model = "gpt-4o"
         self.default_image_quality = "low"
 
         load_dotenv()
         openai_api_key = os.environ.get("OPEN_AI_KEY")
         self.client = OpenAI(api_key=openai_api_key)
 
-        # Examples
-        self.available_tools = {
-            "execute_python": ExecutePythonFunction(robot),
-            "move": MoveFunction(robot),
-            "speak": SpeakFunction(robot)
-        }
+        self.tools = tools
 
     def complete(self, messages: list):
         """
@@ -54,7 +56,7 @@ class OpenAIModel:
         response = self.client.chat.completions.create(
             model=self.model,
             messages=messages,
-            tools=[tool.function_schema for tool in self.available_tools.values()],
+            tools=[tool.function_schema for tool in self.tools.values()],
             tool_choice="auto"
         )
 
@@ -79,7 +81,7 @@ class OpenAIModel:
             messages.extend(tool_responses)
 
             # Re-run the conversation with updated messages
-            return self.complete(messages)
+            # return self.complete(messages)
 
         return response_message.content, messages
 
@@ -99,8 +101,8 @@ class OpenAIModel:
             tool_name = tool_call.function.name
             arguments = json.loads(tool_call.function.arguments)
 
-            if tool_name in self.available_tools:
-                tool_response = self.available_tools[tool_name].execute(**arguments)
+            if tool_name in self.tools:
+                tool_response = self.tools[tool_name].execute(**arguments)
 
                 tool_call_responses.append({
                     "role": "tool",
@@ -112,5 +114,16 @@ class OpenAIModel:
         return tool_call_responses
 
 
+class MemoryManager:
+    def __init__(self):
+        self.system_prompt = {
+            "role": "system",
+            "content": "You are a helpful robot assistant. Follow user instructions carefully."
+        }
+
+
+    def get_memory_as_messages(self):
+        """Returns stored memory as a flat list of messages, ensuring system prompt is included."""
+        return [self.system_prompt]
 
     
