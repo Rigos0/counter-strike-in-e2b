@@ -1,0 +1,152 @@
+# Setting up a CS 1.6 server on a Ubuntu machine using reHLDS, ReGameDLL, Metamod-R and reUnion.
+# Honestly, if you REALLY don't need to go through this process, just save yourself the nerves. If you need a CS server, use HLDS and authorised clients.
+# https://www.youtube.com/watch?v=TahAqBAoh5k (---only steam authorised clients)
+# https://ixnfo.com/en/launching-and-configuring-counter-strike-1-6-server-on-linux.html
+# start with the steps provided in the link to install hlds. Next, we need to replace hlds binaries with reverse-engineered reHLDS binaries. 
+
+apt-get install lib32stdc++6                 # in the tutorial, there is old version of this
+
+
+# -----------------------in steamCMD console, downgrade to older cs 1.6 version --------------
+# -----------https://github.com/rehlds/ReHLDS/issues/999
+app_set_config 90 mod cstrike
+app_update 90 -beta steam_legacy validate
+quit
+
+
+# --------------------REHLDS: this goes into hlds folder-----------------------------------------
+cd hlds
+mv engine_i486.so engine_i486.so.old                          # probably not needed
+wget https://github.com/rehlds/ReHLDS/releases/download/3.14.0.857/rehlds-bin-3.14.0.857.zip -O rehlds.zip
+sudo apt install unzip
+unzip rehlds.zip               
+cp -v bin/linux32/hlds_linux .                                # this will replace hlds files with reHLDS files
+cp -v bin/linux32/*.so .
+chmod +x hlds_linux                                           # the hlds_linux need to become an executable command which is used by reHLDS and 								      # not HLDS
+
+
+
+# -----------------------------------ReGameDLL------------------------------------------------
+wget https://github.com/rehlds/ReGameDLL_CS/releases/download/5.28.0.756/regamedll-bin-5.28.0.756.zip -O regamedll.zip
+unzip regamedll.zip
+mv cstrike/dlls/cs.so cstrike/dlls/cs.so.old              # rename the old binary
+cp bin/linux32/cstrike/dlls/cs.so cstrike/dlls/cs.so      # replace it with the downloaded one
+
+
+
+# -----------------------------------Metamod-r-------------------------------------------------
+mkdir -p addons/metamod/dlls          ### METAMOD SHOULD ACTUALLY GO TO addons/metamod/dlls/metamod_i386.so
+cd /cstrike/
+wget https://github.com/rehlds/Metamod-R/releases/download/1.3.0.149/metamod-bin-1.3.0.149.zip -O addons/metamod/metamod-r_i386.so
+
+# ----execute this to get correct plugins.gam. Afterwards, verify correct folder and the contents----------
+cat > ~/hlds/cstrike/addons/metamod/plugins.ini << 'EOF'
+linux addons/reunion/reunion_mm_i386.so
+EOF
+
+# -------------execute this to get correct liblist.gam-----------------------------------------
+cat > ~/hlds/cstrike/liblist.gam << 'EOF'
+game "Counter-Strike"
+url_info "www.counter-strike.net"
+url_dl ""
+version "1.6"
+size "184000000"
+svonly "0"
+secure "1"
+type "multiplayer_only"
+cldll "1" 
+hlversion "1111"
+nomodels "1"
+nohimodel "1"
+mpentity "info_player_start"
+gamedll "addons/metamod/dlls/metamod.dll" 
+gamedll_linux "addons/metamod/dlls/metamod_i386.so" 
+gamedll_osx "dlls/cs.dylib"
+trainmap "tr_1"
+edicts	"1800"
+EOF
+
+# ----------------------------------------------reUnion----------------------------------------------------
+cd /cstrike/addons
+sudo mkdir -p reunion
+cd reunion
+wget https://github.com/rehlds/reUnion/releases/download/0.2.0.25/reunion-0.2.0.25.zip
+unzip reunion-0.2.0.25.zip                
+sudo cp bin/Linux/reunion_mm_i386.so addons/reunion/reunion_mm_i386.so    # we need to get bin/Linux/reunion_mm_i386.so into the reunion dir
+
+# -------------reunion.cfg----------------------------
+nano ~/hlds/cstrike/addons/reunion/reunion.cfg               # file allow connections from non-Steam clients
+# Reunion configuration file
+
+# Authentication mode:
+#  - Steam       - Only Steam clients (official)
+#  - SteamEmu    - Emulated clients
+#  - RevEmu      - More compatible emulator support
+#  - OldRevEmu   - Old RevEmu protocol
+#  - Auto        - Tries to auto-detect the client
+#  - NoSteam     - Accepts all clients (last resort, insecure)
+AuthProtocol = "NoSteam"
+
+
+
+
+# ------configuring the server----------
+cd /cstrike/
+echo 'sv_lan 0' >> server.cfg
+echo 'sv_consistency 0' >> server.cfg
+echo 'rcon_password "e2b"' >> server.cfg          # set your own password
+
+
+
+# -------------------------------------------debugging--------------------------------------------------------
+# if you made it here, great job. You are close to starting the server (not really)
+# Now it's time for integration hell of you finding all the types you made and 
+# finding out a lot of the .so files you need don't have execution rights (my bad haha)
+chmod +x addons/metamod/dlls/metamod_i386.so      
+chmod +x addons/reunion/reunion_mm_i386.so     
+      # verify both with:
+ls -lh addons/metamod/dlls/metamod_i386.so
+ls -lh addons/reunion/reunion_mm_i386.so
+
+
+
+#----------------------------------------running the server ------------------------------------------------------#
+# you can do something like this from inside the hlds dir
+./hlds_run -game cstrike -port 27015 +maxplayers 20 +map de_dust2 +sv_lan 0 -insecure -nomaster -debug
+
+# verify that the server is running using reHLDS and not HLDS (there MUST be reHLDS mentioned in the server startup log)
+# verify the reunion plugin is up and running 
+meta list
+
+# if you can see the plugin, you are good to go!
+# run cs using wine with open console https://www.youtube.com/watch?v=nHASZOPiLdY
+wine hl.exe -steam -game cstrike -appid 10 -noipx -nojoy -noforcemspd -noforcemparms -noforcemaccel
+
+# -----client console------------
+connect <IP>:27015                    # should connect you to the server
+
+
+#---- debugging------
+rcon_address <IP>:27015
+rcon_password <password_from_your_server.cfg>
+rcon meta list
+
+
+
+
+
+# ----------------------------BIBLIOGRAPHY--------------------------#
+https://www.youtube.com/watch?v=nHASZOPiLdY
+https://www.youtube.com/watch?v=TahAqBAoh5k
+https://github.com/rehlds/ReHLDS/issues/999
+http://metamod.org/metamod.html
+
+
+https://github.com/rehlds/ReHLDS/releases
+https://github.com/rehlds/Metamod-R/releases
+https://github.com/rehlds/reUnion/releases/
+
+
+
+
+
