@@ -25,7 +25,6 @@ class BaseFunction(ABC):
         pass
 
 
-
 class OpenAIModel:
     """
     Communicates with the OpenAI Api
@@ -38,14 +37,15 @@ class OpenAIModel:
             }
     """
     def __init__(self, 
-                 tools: Dict[str, BaseFunction] = {}):
-        self.model = "gpt-4o"
+                 tools: Dict[str, BaseFunction] = {},
+                 model: str="gpt-4o"):
+        
+        self.model = model
         self.default_image_quality = "low"
 
         load_dotenv()
         openai_api_key = os.environ.get("OPEN_AI_KEY")
         self.client = OpenAI(api_key=openai_api_key)
-
         self.tools = tools
 
     def complete(self, messages: list):
@@ -112,13 +112,52 @@ class OpenAIModel:
                 })
 
         return tool_call_responses
+    
+
+class GroqModel(OpenAIModel):
+    def __init__(self, 
+                 tools: Dict[str, BaseFunction] = {},
+                 model: str = "meta-llama/llama-4-scout-17b-16e-instruct"):
+
+        self.model = model
+        self.default_image_quality = "low"
+
+        load_dotenv()
+        groq_api_key = os.environ.get("GROQ_API_KEY")
+        self.client = OpenAI(base_url="https://api.groq.com/openai/v1",
+                             api_key=groq_api_key)
+        self.tools = tools
+
+    def complete(self, messages: list):
+        """
+        Sends a conversation to the OpenAI API and processes responses,
+        including tool calls when required.
+        """
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+        )
+
+        response_message = response.choices[0].message
+
+        # print("Initial response: ")
+        # print(response_message)
+        # print("\n")
+
+        # Append the assistant's response to maintain conversation history
+        messages.append({
+            "role": "assistant",
+            "content": response_message.content,
+        })
+
+        return response_message.content, messages
 
 
 class MemoryManager:
     def __init__(self):
         self.system_prompt = {
             "role": "system",
-            "content": "You are a helpful robot assistant. Follow user instructions carefully."
+            "content": " Output only a function call, nothing else."
         }
 
 

@@ -14,7 +14,7 @@ app_update 90 -beta steam_legacy validate
 quit
 
 
-# --------------------REHLDS: this goes into hlds folder-----------------------------------------
+# --------------------REHLDS: goes into hlds folder-----------------------------------------
 cd hlds
 mv engine_i486.so engine_i486.so.old                          # probably not needed
 wget https://github.com/rehlds/ReHLDS/releases/download/3.14.0.857/rehlds-bin-3.14.0.857.zip -O rehlds.zip
@@ -120,11 +120,10 @@ meta list
 
 # if you can see the plugin, you are good to go!
 # run cs using wine with open console https://www.youtube.com/watch?v=nHASZOPiLdY
-wine hl.exe -steam -game cstrike -appid 10 -noipx -nojoy -noforcemspd -noforcemparms -noforcemaccel
+wine .wine/drive_c/Games/'Counter-strike 1.6 Original'/hl.exe -steam -game cstrike -appid 10 -noipx -nojoy -noforcemspd -noforcemparms -noforcemaccel
 
 # -----client console------------
 connect <IP>:27015                    # should connect you to the server
-
 
 #---- debugging------
 rcon_address <IP>:27015
@@ -147,6 +146,6 @@ https://github.com/rehlds/Metamod-R/releases
 https://github.com/rehlds/reUnion/releases/
 
 
-
-
-
+#-----maps--------------#
+cd hlds/cstrike/maps
+wget https://static2.cs-bg.net/files/maps/cs-2976-aim_map_2010.zip
