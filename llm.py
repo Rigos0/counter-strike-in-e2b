@@ -1,27 +1,23 @@
-from abc import ABC, abstractmethod
 import os
 from dotenv import load_dotenv
 from typing import Dict, List, Tuple
 import json
+from abc import ABC, abstractmethod
+
 
 from openai import OpenAI
-
+from tools import BaseTool
 
 load_dotenv()
 
-
-class BaseFunction(ABC):
-    @property
+class BaseModel(ABC):
     @abstractmethod
-    def function_schema(self):
-        pass
-
-    @abstractmethod
-    def execute(self, **kwargs):
+    def complete(self, **kwargs):
         pass
 
 
-class OpenAIModel:
+
+class OpenAIModel(BaseModel):
     """
     Communicates with the OpenAI Api
 
@@ -33,18 +29,17 @@ class OpenAIModel:
             }
     """
     def __init__(self, 
-                 tools: Dict[str, BaseFunction] = {},
+                 tools: Dict[str, BaseTool] = {},
                  model: str="gpt-4o"):
         
         self.model = model
         self.default_image_quality = "low"
 
-        load_dotenv()
         openai_api_key = os.environ.get("OPEN_AI_KEY")
         self.client = OpenAI(api_key=openai_api_key)
         self.tools = tools
 
-    def complete(self, messages: list):
+    def complete(self, messages: List):
         """
         Sends a conversation to the OpenAI API and processes responses,
         including tool calls when required.
@@ -58,13 +53,10 @@ class OpenAIModel:
 
         response_message = response.choices[0].message
 
-        print(response_message)
-
         if response_message.tool_calls:
             tool_responses = self._handle_tool_calls(response_message.tool_calls)        
 
-        return response_message.content, messages, response_message
-    
+        return response_message.content, response
 
     def _handle_tool_calls(self, tool_calls):
         """
@@ -100,17 +92,111 @@ class OpenAIModel:
 
 class GroqModel(OpenAIModel):
     def __init__(self, 
-                 tools: Dict[str, BaseFunction] = {},
+                 tools: Dict[str, BaseTool] = {},
                  model: str = "meta-llama/llama-4-scout-17b-16e-instruct"):
 
         self.model = model
         self.default_image_quality = "low"
 
-        load_dotenv()
         groq_api_key = os.environ.get("GROQ_API_KEY")
         self.client = OpenAI(base_url="https://api.groq.com/openai/v1",
                              api_key=groq_api_key)
         self.tools = tools
+
+
+class OpenRouterModel(OpenAIModel):
+    "No tools" 
+    def __init__(self, 
+                 model: str = "qwen/qwen2.5-vl-3b-instruct:free"):
+
+        self.model = model
+
+        open_router_api_key = os.environ.get("OPENROUTER_API_KEY")
+        self.client = OpenAI(base_url="https://openrouter.ai/api/v1",
+                             api_key=open_router_api_key)
+
+
+class AimingModel(OpenRouterModel):
+    # Only the Qwen2.5 VL models support grounding
+    # https://openrouter.ai/qwen/
+    ALLOWED_MODELS = [
+        "qwen/qwen2.5-vl-3b-instruct:free",
+        "qwen/qwen-2.5-vl-7b-instruct:free",
+        "qwen/qwen-2.5-vl-7b-instruct",
+        "qwen/qwen2.5-vl-32b-instruct:free",
+        "qwen/qwen2.5-vl-32b-instruct",
+        "qwen/qwen2.5-vl-72b-instruct"
+    ]
+
+    example_response = json.dumps(
+    {
+        "point": {"x": "500", "y": "452"},
+    },
+    ensure_ascii=False
+    )
+
+    system_message = {
+            "role": "system",
+            "content": f"""Locate the middle point of the nearest standing person from counterstrike gameplay. Output JSON containing the point.
+            Important: Don't provide any reasoning, only JSON.
+            Example:
+            
+            Q: <provided gameplay image>
+            A: {example_response}"""
+        }
+
+    def __init__(self, 
+                 model: str = "qwen/qwen2.5-vl-32b-instruct",
+                 system_message = system_message):
+
+        if model not in self.ALLOWED_MODELS:
+            raise ValueError(f"Model '{model}' can't be used for aiming. Allowed models are: {self.ALLOWED_MODELS}")
+
+        super().__init__(model=model)
+        self.system_message = system_message
+
+
+    def complete(self, messages: List):
+        # Don't include the system message here.
+        # Image should be provided to locate the enemy.
+
+        messages.insert(0, self.system_message)
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+        )
+
+        response_message = response.choices[0].message
+
+        return response_message.content, response
+    
+    def parse_point_json(self, model_response: str):
+        """
+        Parse a single point from a JSON string or dict of the form:
+        { "point": { "x": "678", "y": "691" } }
+
+        Args:
+            model_response (str or dict): JSON string or already‐decoded dict.
+
+        Returns:
+            dict: { 'x': int, 'y': int }
+
+        """
+
+        model_response = model_response.strip("```")
+        model_response = model_response.strip("json")
+        if isinstance(model_response, str):
+            data = json.loads(model_response)
+        else:
+            data = model_response
+
+        if 'point' not in data or 'x' not in data['point'] or 'y' not in data['point']:
+            raise KeyError("Expected format: { 'point': { 'x': ..., 'y': ... } }")
+
+        return {
+            'x': int(data['point']['x']),
+            'y': int(data['point']['y'])
+        }
 
 
 class MemoryManager:
