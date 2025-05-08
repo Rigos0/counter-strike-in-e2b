@@ -1,6 +1,7 @@
 import base64
 from e2b_desktop import Sandbox
 from PIL import Image, ImageDraw, ImageFont
+from typing import Dict, List, Tuple
 
 def encode_image(image_path):
     with open(image_path, "rb") as image_file:
@@ -175,8 +176,9 @@ def calculate_mouse_movements(screenshot_coords, x_mid, y_mid, aim_multiplier, s
             
     return movements
 
-def aim_to_position(coords: Dict[str, float]):
-    """Aims and moves the mouse towards a target derived from input coordinates."""
+
+def get_mouse_movements(coords: Dict[str, float]):
+    """Get list of mouse movements towards a target derived from input coordinates."""
     scr_x = coords["x"]
     scr_y = coords["y"]
     screenshot_coords = (scr_x, scr_y)
@@ -200,15 +202,4 @@ def aim_to_position(coords: Dict[str, float]):
         screen_height
     )
 
-    # Execute the movements
-    print(f"Aiming based on input coords: {coords}")
-    if not planned_movements:
-        print("No movement calculated.")
-    else:
-        for i, move_coords in enumerate(planned_movements):
-            print(f"Aiming to coords {i+1}: {move_coords}")
-            desktop.move_mouse(**move_coords)
-    print("-" * 30)
-
-
-
+    return planned_movements

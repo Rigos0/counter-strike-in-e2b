@@ -2,7 +2,7 @@ from typing import List
 from e2b_desktop import Sandbox
 
 
-def execute_mouse_movements(mouse_movements: List, desktop: "Sandbox"):
+def aim(mouse_movements: List, desktop: "Sandbox"):
     for i, move_coords in enumerate(mouse_movements):
         print(f"Aiming to coords {i+1}: {move_coords}")
         desktop.move_mouse(**move_coords)
