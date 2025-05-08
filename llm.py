@@ -11,10 +11,6 @@ load_dotenv()
 
 
 class BaseFunction(ABC):
-    """
-    Abstract class for defining a function with schema and execution logic.
-    """
-
     @property
     @abstractmethod
     def function_schema(self):
@@ -62,28 +58,13 @@ class OpenAIModel:
 
         response_message = response.choices[0].message
 
-        # print("Initial response: ")
-        # print(response_message)
-        # print("\n")
+        print(response_message)
 
-        # Append the assistant's response to maintain conversation history
-        messages.append({
-            "role": "assistant",
-            "content": response_message.content,
-            "tool_calls": response_message.tool_calls
-        })
-
-        # Process any tool calls requested by the model
         if response_message.tool_calls:
-            tool_responses = self._handle_tool_calls(response_message.tool_calls)
+            tool_responses = self._handle_tool_calls(response_message.tool_calls)        
 
-            # Append tool responses to messages
-            messages.extend(tool_responses)
-
-            # Re-run the conversation with updated messages
-            # return self.complete(messages)
-
-        return response_message.content, messages
+        return response_message.content, messages, response_message
+    
 
     def _handle_tool_calls(self, tool_calls):
         """
@@ -100,16 +81,19 @@ class OpenAIModel:
         for tool_call in tool_calls:
             tool_name = tool_call.function.name
             arguments = json.loads(tool_call.function.arguments)
+            print(f"Arguments: {arguments}")
 
-            if tool_name in self.tools:
-                tool_response = self.tools[tool_name].execute(**arguments)
+            if tool_name not in self.tools:
+                print(f"The model halucinated a tool {tool_name}. The tool is not defined.")
+                continue
 
-                tool_call_responses.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "name": tool_name,
-                    "content": tool_response
-                })
+            tool_response = self.tools[tool_name].execute(**arguments)
+            # tool_call_responses.append({
+            #     "role": "tool",
+            #     "tool_call_id": tool_call.id,
+            #     "name": tool_name,
+            #     "content": tool_response
+            # })
 
         return tool_call_responses
     
@@ -127,30 +111,6 @@ class GroqModel(OpenAIModel):
         self.client = OpenAI(base_url="https://api.groq.com/openai/v1",
                              api_key=groq_api_key)
         self.tools = tools
-
-    def complete(self, messages: list):
-        """
-        Sends a conversation to the OpenAI API and processes responses,
-        including tool calls when required.
-        """
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-        )
-
-        response_message = response.choices[0].message
-
-        # print("Initial response: ")
-        # print(response_message)
-        # print("\n")
-
-        # Append the assistant's response to maintain conversation history
-        messages.append({
-            "role": "assistant",
-            "content": response_message.content,
-        })
-
-        return response_message.content, messages
 
 
 class MemoryManager:
