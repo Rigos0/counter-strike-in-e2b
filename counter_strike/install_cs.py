@@ -36,3 +36,33 @@ def install_cs_1_6(desktop: Sandbox):
     desktop.wait(30000) # installation process
     desktop.wait(30000) # installation process
     desktop.press("enter") # LAUNCH
+
+
+def connect_to_server(desktop: "Sandbox", ip_address: str):
+    desktop.wait(5000)
+    desktop.left_click(76, 948) # click on Find Servers
+    desktop.wait(1000)
+    desktop.left_click(258, 76) # Click on Favorites Tab
+    desktop.wait(1000)
+    desktop.left_click(665, 604) # Add server
+    desktop.wait(1000)
+    desktop.write(text=ip_address) # Type server ip Address
+    desktop.wait(500)
+    desktop.left_click(1119, 527) # Add server to favourites
+    desktop.wait(500)
+    desktop.left_click(273, 126) # Select the added server
+    desktop.wait(500)
+    desktop.left_click(849, 606) # Connect
+    # Now wait at least 2 mins for connection and Download
+    for i in range(5):
+        print(i)
+        desktop.wait(30_000)
+
+def choose_team(desktop: "Sandbox", team_option: str = "1", skin: str = "4"):
+    # Team: 1=T, 2=CT, 6=SPECTATE
+    # Skin: T side: Guerilla warfare skin because they have the red headband
+    desktop.press("enter")
+    desktop.wait(300)
+    desktop.press(team_option) # 1=T, 2=CT, 6=SPECTATE
+    desktop.wait(300)
+    desktop.press(skin) # T side: Guerilla warfare skin because they have the red headband
