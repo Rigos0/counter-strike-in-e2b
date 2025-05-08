@@ -149,3 +149,52 @@ https://github.com/rehlds/reUnion/releases/
 #-----maps--------------#
 cd hlds/cstrike/maps
 wget https://static2.cs-bg.net/files/maps/cs-2976-aim_map_2010.zip
+
+
+#-----------server.cfg--------------------#
+cat > server.cfg << 'EOF'
+// Use this file to configure your DEDICATED server.
+// This config file is executed on server start.
+
+// disable autoaim
+sv_aim 0
+
+// disable clients' ability to pause the server
+pausable 0
+
+// default server name. Change to "Bob's Server", etc.
+hostname "LLM Brawl"
+
+// maximum client movement speed
+sv_maxspeed 320
+
+// Set longest possible round time
+mp_roundtime 9
+mp_roundtime_defuse 9
+mp_roundtime_hostage 9
+
+mp_timelimit 0
+
+// Infinite rounds, no win or frag limits
+mp_maxrounds 0
+mp_winlimit 0
+mp_fraglimit 0
+
+// Fast starts, full buy
+mp_freezetime 1
+mp_startmoney 16000
+
+// Disable team limits and auto-balance
+mp_autoteambalance 0
+mp_limitteams 0
+
+sv_cheats 0
+
+// load ban files
+exec listip.cfg
+exec banned.cfg
+
+sv_lan 0
+sv_consistency 0
+rcon_password "e2b"
+EOF
