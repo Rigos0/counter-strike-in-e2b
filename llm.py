@@ -125,7 +125,7 @@ class AimingModel(OpenRouterModel):
         "qwen/qwen-2.5-vl-7b-instruct",
         "qwen/qwen2.5-vl-32b-instruct:free",
         "qwen/qwen2.5-vl-32b-instruct",
-        "qwen/qwen2.5-vl-72b-instruct"
+        "qwen/qwen2.5-vl-72b-instruct",
     ]
 
     example_response = json.dumps(
@@ -138,7 +138,7 @@ class AimingModel(OpenRouterModel):
     system_message = {
             "role": "system",
             "content": f"""Locate the middle point of the nearest standing person from counterstrike gameplay. Output JSON containing the point.
-            Important: Don't provide any reasoning, only JSON.
+            Important: Don't provide any reasoning, only JSON. If there is no person return "None".
             Example:
             
             Q: <provided gameplay image>
@@ -208,6 +208,39 @@ class AimingModel(OpenRouterModel):
             print("Error:", str(e))
             print("Model response:", model_response)
             return None
+        
+
+class GeminiAimingModel(AimingModel):
+    # Gemini models seem to also support grounding.
+    # https://ai.google.dev/gemini-api/docs/image-understanding#python_4
+    ALLOWED_MODELS = [
+        "google/gemini-2.0-flash-exp:free",
+        "google/gemini-2.5-flash-preview"
+    ]
+
+
+    def __init__(self, 
+                 model: str = "google/gemini-2.0-flash-exp:free"):
+
+        super().__init__(model=model)
+
+    # TODO: Gemini coordinates need to be descaled.
+    # see: https://ai.google.dev/gemini-api/docs/image-understanding#bbox
+    def complete(self, messages: List):
+        # Don't include the system message here.
+        # Image should be provided to locate the enemy.
+
+        messages.insert(0, self.system_message)
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+        )
+
+        print(response)
+
+        response_message = response.choices[0].message
+
+        return response_message.content, response
 
 
 class MemoryManager:
