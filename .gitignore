@@ -1,4 +1,9 @@
 .env
 open-computer-use
 
-__pycache__
+**/__pycache__/
+
+server-key
+
+nbs/test.py
+*.jpg

@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 
 from openai import OpenAI
-from tools import BaseTool
+from llms.tools import BaseTool
 
 load_dotenv()
 
@@ -114,6 +114,8 @@ class OpenRouterModel(OpenAIModel):
         open_router_api_key = os.environ.get("OPENROUTER_API_KEY")
         self.client = OpenAI(base_url="https://openrouter.ai/api/v1",
                              api_key=open_router_api_key)
+        
+        self.tools = {}
 
 
 class AimingModel(OpenRouterModel):
@@ -137,7 +139,7 @@ class AimingModel(OpenRouterModel):
 
     system_message = {
             "role": "system",
-            "content": f"""Locate the middle point of the nearest standing person from counterstrike gameplay. Output JSON containing the point.
+            "content": f"""Locate the middle point of the head of the nearest standing person from counterstrike gameplay. Output JSON containing the point.
             Important: Don't provide any reasoning, only JSON. If there is no person return "None".
             Example:
             
