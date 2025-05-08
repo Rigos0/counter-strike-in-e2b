@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import json
 from abc import ABC, abstractmethod
 
@@ -147,13 +147,15 @@ class AimingModel(OpenRouterModel):
 
     def __init__(self, 
                  model: str = "qwen/qwen2.5-vl-32b-instruct",
-                 system_message = system_message):
+                 system_message = system_message,
+                 temperature: Optional[float | None] = None):
 
         if model not in self.ALLOWED_MODELS:
             raise ValueError(f"Model '{model}' can't be used for aiming. Allowed models are: {self.ALLOWED_MODELS}")
 
         super().__init__(model=model)
         self.system_message = system_message
+        self.temperature = temperature
 
 
     def complete(self, messages: List):
@@ -163,6 +165,7 @@ class AimingModel(OpenRouterModel):
         messages.insert(0, self.system_message)
         response = self.client.chat.completions.create(
             model=self.model,
+            temperature=self.temperature,
             messages=messages,
         )
 
@@ -176,27 +179,35 @@ class AimingModel(OpenRouterModel):
         { "point": { "x": "678", "y": "691" } }
 
         Args:
-            model_response (str or dict): JSON string or already‐decoded dict.
+            model_response (str or dict): JSON string or already-decoded dict.
 
         Returns:
-            dict: { 'x': int, 'y': int }
-
+            dict: { 'x': int, 'y': int } or None if format is invalid.
         """
+        try:
+            if isinstance(model_response, str):
+                cleaned = model_response.strip().strip("`").strip("json").strip()
+                data = json.loads(cleaned)
+            else:
+                data = model_response
 
-        model_response = model_response.strip("```")
-        model_response = model_response.strip("json")
-        if isinstance(model_response, str):
-            data = json.loads(model_response)
-        else:
-            data = model_response
+            point = data.get("point", {})
+            x = point.get("x")
+            y = point.get("y")
 
-        if 'point' not in data or 'x' not in data['point'] or 'y' not in data['point']:
-            raise KeyError("Expected format: { 'point': { 'x': ..., 'y': ... } }")
+            if x is None or y is None:
+                raise ValueError("Missing 'x' or 'y' keys in 'point'.")
 
-        return {
-            'x': int(data['point']['x']),
-            'y': int(data['point']['y'])
-        }
+            return {
+                'x': int(x),
+                'y': int(y)
+            }
+
+        except Exception as e:
+            print("Model did not adhere to the aiming structure.")
+            print("Error:", str(e))
+            print("Model response:", model_response)
+            return None
 
 
 class MemoryManager:
