@@ -96,7 +96,6 @@ class GroqModel(OpenAIModel):
                  model: str = "meta-llama/llama-4-scout-17b-16e-instruct"):
 
         self.model = model
-        self.default_image_quality = "low"
 
         groq_api_key = os.environ.get("GROQ_API_KEY")
         self.client = OpenAI(base_url="https://api.groq.com/openai/v1",
@@ -104,21 +103,37 @@ class GroqModel(OpenAIModel):
         self.tools = tools
 
 
-class OpenRouterModel(OpenAIModel):
+class BaseOpenRouterModel(BaseModel):
     "No tools" 
     def __init__(self, 
                  model: str = "qwen/qwen2.5-vl-3b-instruct:free"):
 
         self.model = model
-
         open_router_api_key = os.environ.get("OPENROUTER_API_KEY")
         self.client = OpenAI(base_url="https://openrouter.ai/api/v1",
                              api_key=open_router_api_key)
         
-        self.tools = {}
+
+    def complete(self, messages: List):
+        # Don't include the system message here.
+        # Image should be provided to locate the enemy.
+
+        response = self.client.chat.completions.create(
+            model= self.model,
+            temperature=self.temperature,
+            messages=messages,
+        )
+
+        if not response.id:
+            print(f"Response blocked: {response}")
+            return None, response
+
+        response_message = response.choices[0].message
+
+        return response_message.content, response
 
 
-class AimingModel(OpenRouterModel):
+class AimingModel(BaseOpenRouterModel):
     # Only the Qwen2.5 VL models support grounding
     # https://openrouter.ai/qwen/
     ALLOWED_MODELS = [
@@ -129,6 +144,13 @@ class AimingModel(OpenRouterModel):
         "qwen/qwen2.5-vl-32b-instruct",
         "qwen/qwen2.5-vl-72b-instruct",
     ]
+
+    # Default fallback order
+    MODELS_ORDERED = [
+        "qwen/qwen2.5-vl-32b-instruct",
+        "qwen/qwen2.5-vl-72b-instruct", 
+        "qwen/qwen-2.5-vl-7b-instruct",
+        "qwen/qwen2.5-vl-32b-instruct:free"]
 
     example_response = json.dumps(
     {
@@ -148,28 +170,42 @@ class AimingModel(OpenRouterModel):
         }
 
     def __init__(self, 
-                 model = "qwen/qwen2.5-vl-32b-instruct",
+                 model: str = "qwen/qwen2.5-vl-32b-instruct",
                  system_message = system_message,
                  temperature: Optional[float | None] = None):
 
         if model not in self.ALLOWED_MODELS:
             raise ValueError(f"Model '{model}' can't be used for aiming. Allowed models are: {self.ALLOWED_MODELS}")
+        
+        print(self.MODELS_ORDERED)
+        print(model)
+        self.fallback_models = [m for m in self.MODELS_ORDERED if m != model]
+        print(self.fallback_models)
 
         super().__init__(model=model)
         self.system_message = system_message
         self.temperature = temperature
 
 
-    def complete(self, messages: List):
-        # Don't include the system message here.
+    def complete(self, user_messages: List, debug: bool = False):
+        # Don't include the system message as a parameter
         # Image should be provided to locate the enemy.
 
-        messages.insert(0, self.system_message)
+        messages = [self.system_message] + user_messages
         response = self.client.chat.completions.create(
-            model=["qwen/qwen2.5-vl-32b-instruct", "qwen/qwen-2.5-vl-7b-instruct"],
+            model= self.model,
+            extra_body={
+                        "models": self.fallback_models,
+                        "provider": {
+                             "ignore": ["Together"] # Together is expensive
+                            },
+                        },
             temperature=self.temperature,
             messages=messages,
         )
+
+        if debug: 
+            print(response)
 
         if not response.id:
             print(f"Response blocked: {response}")
