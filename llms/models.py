@@ -148,7 +148,7 @@ class AimingModel(OpenRouterModel):
         }
 
     def __init__(self, 
-                 model: str = "qwen/qwen2.5-vl-32b-instruct",
+                 model = "qwen/qwen2.5-vl-32b-instruct",
                  system_message = system_message,
                  temperature: Optional[float | None] = None):
 
@@ -166,10 +166,14 @@ class AimingModel(OpenRouterModel):
 
         messages.insert(0, self.system_message)
         response = self.client.chat.completions.create(
-            model=self.model,
+            model=["qwen/qwen2.5-vl-32b-instruct", "qwen/qwen-2.5-vl-7b-instruct"],
             temperature=self.temperature,
             messages=messages,
         )
+
+        if not response.id:
+            print(f"Response blocked: {response}")
+            return None, response
 
         response_message = response.choices[0].message
 
