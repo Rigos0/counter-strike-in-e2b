@@ -2,26 +2,47 @@ import base64
 from e2b_desktop import Sandbox
 from PIL import Image, ImageDraw, ImageFont
 from typing import Dict, List, Tuple
+from io import BytesIO
 
-def encode_image(image_path):
+
+def encode_image(image_path: str):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
+        
+
+def save_image(image_bytes: bytes, filename: str):
+    with open(filename, "wb") as f:
+        f.write(image_bytes)
 
 
-def get_screenshot(desktop: Sandbox, filename = "screenshot.jpg"):
-    image_bytes = desktop.screenshot(format="bytes")
+def compress_image_bytes(image_bytes: bytes, quality=70) -> bytes:
+    image = Image.open(BytesIO(image_bytes))
+    buffer = BytesIO()
+    image.convert("RGB").save(buffer, format="JPEG", quality=quality, optimize=True)
+    return buffer.getvalue()
+
+
+def encode_base64(image_bytes: bytes) -> str:
+    return base64.b64encode(image_bytes).decode("utf-8")
+
+
+def capture_screenshot_bytes(desktop) -> bytes:
+    return desktop.screenshot(format="bytes")
+
+
+def get_screenshot(desktop, filename="screenshot.jpg", quality: int = None) -> str:
+    raw_bytes = capture_screenshot_bytes(desktop=desktop)
+
+    if quality:
+        raw_bytes = compress_image_bytes(raw_bytes, quality=quality) 
 
     if filename:
-        with open(filename, "wb") as f:
-            f.write(image_bytes)
+        save_image(raw_bytes, filename)
 
-    base64_image = base64.b64encode(image_bytes).decode("utf-8")
+    return base64.b64encode(raw_bytes).decode("utf-8")
 
-    return base64_image
-
-
-def get_screenshot_message(desktop: Sandbox, filename: str | None = None):
-    base64_image = get_screenshot(desktop, filename)
+def get_screenshot_message(desktop: Sandbox, filename: str | None = None, quality: int = None):
+    base64_image = get_screenshot(desktop, filename=filename, quality=quality)
     return [
         {
             "role": "user",
