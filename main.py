@@ -1,4 +1,3 @@
-import sys
 import os
 from e2b_desktop import Sandbox, CommandExitException
 from dotenv import load_dotenv
@@ -6,11 +5,10 @@ load_dotenv()
 
 
 from counter_strike.install_cs import install_cs_1_6, connect_to_server, choose_team
-from counter_strike.image_handling import get_screenshot_message, draw_point
-from counter_strike.image_handling import get_mouse_movements
-from counter_strike.controls import aim, shoot
+from counter_strike.agent import run_agent
 
-from llms.models import AimingModel
+from llms.models import AimingModel, OpenRouterGameplayModel
+from llms.tools import MoveTool
 
 
 E2B_API_KEY = os.environ.get("E2B_API_KEY")
@@ -29,33 +27,22 @@ url_view = desktop.stream.get_url(view_only=True) # only viewing
 print(url_view)
 
 
-aiming_model = AimingModel()
+aiming_model = AimingModel(model="qwen/qwen2.5-vl-72b-instruct")
 
-def game_loop():
-    for i in range(30):
-        print(f"Iteration {i}")
-        screenshot_message = get_screenshot_message(desktop, filename="../images/screenshot.jpg")
+move_tool = MoveTool(desktop=desktop)
+tools = {move_tool.name: move_tool}
 
-        point_json, _ = aiming_model.complete(messages=screenshot_message)
-        print(point_json)
-        coords = aiming_model.parse_point_json(point_json)
-        print(coords)
-        print(type(coords))
-        if not coords:
-            # TODO: Define agentic logic to move around 
-            print("Sleeping 5 seconds as enemies not found")
-            desktop.wait(5000)
-            continue
-
-        draw_point(point = coords, image_path="../images/screenshot.jpg", output_path="../images/screenshot_annotated.jpg")
-
-        mouse_movements = get_mouse_movements(coords=coords)
-        aim(mouse_movements, desktop=desktop)
-        shoot(desktop=desktop)
+gameplay_model = OpenRouterGameplayModel(tools=tools, 
+                                         model="google/gemini-2.5-flash-preview")
 
 
 if __name__=="__main__":
     install_cs_1_6(desktop=desktop)
     connect_to_server(desktop=desktop, ip_address=CS_SERVER_IP)
     choose_team(desktop=desktop, team_option="1")
-    game_loop()
+    run_agent(
+        aiming_model=aiming_model,
+        gameplay_model=gameplay_model,
+        desktop=desktop,
+        iterations=20 # For demonstration
+    ) 
