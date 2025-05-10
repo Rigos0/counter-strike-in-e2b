@@ -10,7 +10,7 @@ def aim(mouse_movements: List, desktop: "Sandbox"):
 def shoot(desktop: "Sandbox", clicks: int = 3):
     for i in range(clicks):
         desktop.left_click()
-        desktop.wait(200)
+        desktop.wait(150)
         desktop.left_click()
-        desktop.wait(200)
+        desktop.wait(150)
         desktop.left_click()

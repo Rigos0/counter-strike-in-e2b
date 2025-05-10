@@ -1,4 +1,3 @@
-import os
 from e2b_desktop import Sandbox, CommandExitException
 
 
