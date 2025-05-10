@@ -161,8 +161,9 @@ class AimingModel(BaseOpenRouterModel):
 
     system_message = {
             "role": "system",
-            "content": f"""Locate the middle point of the head of the nearest standing person from counterstrike gameplay. Output JSON containing the point.
-            Important: Don't provide any reasoning, only JSON. If there is no person return "None".
+            "content": f"""As an intelligent robot, your job is to locate the nearest person. Locate the middle of his body. Output JSON containing the point.
+            Important: Don't provide any reasoning, only JSON.
+            Important: If no standing person detected return None.
             Example:
             
             Q: <provided gameplay image>
@@ -197,7 +198,8 @@ class AimingModel(BaseOpenRouterModel):
             extra_body={
                         "models": self.fallback_models,
                         "provider": {
-                             "ignore": ["Together"] # Together is expensive
+                             "order": ["Parasail", "Novita"],
+                             "ignore": ["Together", "Nebius"] # Together is expensive. Nebius can't aim
                             },
                         },
             temperature=self.temperature,
