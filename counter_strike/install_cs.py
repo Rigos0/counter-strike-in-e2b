@@ -54,8 +54,8 @@ def connect_to_server(desktop: "Sandbox", ip_address: str):
     desktop.wait(500)
     desktop.left_click(849, 606) # Connect
     # Now wait at least 2 mins for connection and Download
+    print("Waiting for 150 secs for map download...")
     for i in range(5):
-        print(i)
         desktop.wait(30_000)
 
 def choose_team(desktop: "Sandbox", team_option: str = "1", skin: str = "4"):

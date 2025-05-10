@@ -263,6 +263,9 @@ class AimingModel(BaseOpenRouterModel):
 
         if debug: 
             print(response)
+            
+        print("Model:", response.model)
+        print("Provider:", response.provider)
 
         if not response.id:
             print(f"Response blocked: {response}")
