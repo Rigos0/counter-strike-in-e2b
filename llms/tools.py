@@ -24,13 +24,13 @@ class MoveTool(BaseTool):
         "type": "function",
         "function": {
             "name": name,
-            "description": "Moves the character using a sequence of 10 to 20 basic directional key presses. Each character in the sequence represents a single key press.",
+            "description": "Moves the character using a sequence of 5 basic directions. The actions will be executed in a sequence.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "key_sequence": {
                         "type": "string",
-                        "description": "A string consisting of 10 to 20 characters. Each character must be one of 'w' (forward), 'a' (strafe left), 's' (backward), or 'd' (strafe right). Example: 'wwwwwaaaad'"
+                        "description": "A string consisting of 5 characters. Each character must be one of 'w' (forward), 'a' (strafe left), 's' (backward), or 'd' (strafe right). Example: 'wwaa' will move forward and left."
                     }
                 },
                 "required": ["key_sequence"]
@@ -42,5 +42,10 @@ class MoveTool(BaseTool):
         self.desktop = desktop
     
     def execute(self, key_sequence: str):
-        print(f"moving with key sequence: {key_sequence}")
-        self.desktop.write(key_sequence)
+        sequence_to_write = ""
+        for action in key_sequence:
+            sequence_to_write += action * 10
+
+        # print(f"moving with key sequence: {key_sequence}")
+        # print(sequence_to_write)
+        self.desktop.write(sequence_to_write)

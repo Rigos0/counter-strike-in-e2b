@@ -73,19 +73,13 @@ class OpenAIModel(BaseModel):
         for tool_call in tool_calls:
             tool_name = tool_call.function.name
             arguments = json.loads(tool_call.function.arguments)
-            print(f"Arguments: {arguments}")
+            # print(f"Arguments: {arguments}")
 
             if tool_name not in self.tools:
                 print(f"The model halucinated a tool {tool_name}. The tool is not defined.")
                 continue
 
             tool_response = self.tools[tool_name].execute(**arguments)
-            # tool_call_responses.append({
-            #     "role": "tool",
-            #     "tool_call_id": tool_call.id,
-            #     "name": tool_name,
-            #     "content": tool_response
-            # })
 
         return tool_call_responses
     
@@ -134,6 +128,32 @@ class BaseOpenRouterModel(BaseModel):
     
 
 class OpenRouterGameplayModel(OpenAIModel):
+    # The system message forces the model to always call move_tool for actions
+    SYSTEM_MESSAGE = [
+        {
+            "role": "system",
+            "content": (
+                "You are an AI agent in a Counter-Strike deathmatch simulation. "
+                "All movement commands must be executed exclusively via the move_tool. "
+                "You may not return plain text for movement—every response must invoke the move_tool function with a valid key_sequence of exactly five characters (w/a/s/d)."
+            )
+        }
+    ]
+
+    # The user message describes the current game state and required output
+    INSTRUCTION_MESSAGE = [
+        {
+            "role": "user",
+            "content": (
+                "Current map: aim_map_2010."
+                "Design five consecutive movement steps to locate the enemy: "
+                "1) Choose a combined sequence of 5 keys (w/a/s/d) per move. "
+                "2) Return your answer by calling move_tool with the 'key_sequence' parameter. "
+                "Example: {\"name\": \"move_tool\", \"arguments\": {\"key_sequence\": \"wwaad\"}}"
+            )
+        }
+    ]
+
     "Uses tools"
     def __init__(self, 
                  tools: Dict[str, BaseTool] = {},
@@ -144,6 +164,31 @@ class OpenRouterGameplayModel(OpenAIModel):
         self.client = OpenAI(base_url="https://openrouter.ai/api/v1",
                              api_key=open_router_api_key)
         self.tools = tools
+
+
+    def complete(self, user_messages: List):
+        """
+        Sends a conversation to the OpenAI API and processes responses,
+        including tool calls when required.
+        """
+                                         # user_messages: the history including the screenshots
+        messages = self.SYSTEM_MESSAGE + user_messages + self.INSTRUCTION_MESSAGE
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            tools=[tool.function_schema for tool in self.tools.values()],
+            tool_choice="auto"
+        )
+
+        response_message = response.choices[0].message
+
+        tool_calls = None
+        if response_message.tool_calls:
+            tool_calls = response_message.tool_calls  
+        
+        return response_message.content, response, tool_calls
+        
+        
             
 
 class AimingModel(BaseOpenRouterModel):
@@ -241,12 +286,11 @@ class AimingModel(BaseOpenRouterModel):
         try:
             if isinstance(model_response, str):
                 cleaned = model_response.strip().strip("`").strip("json").strip()
+                if cleaned.lower().startswith("n"): # None or Null returned by model
+                    return None
                 data = json.loads(cleaned)
             else:
                 data = model_response
-
-            if cleaned.lower().startswith("n"): # None or Null returned by model
-                return None
 
             point = data.get("point", {})
             x = point.get("x")
@@ -261,7 +305,7 @@ class AimingModel(BaseOpenRouterModel):
             }
 
         except Exception as e:
-            print(f"Model did not adhere to the aiming structure. Response: {model_response}")
+            # print(f"Model did not adhere to the aiming structure. Response: {model_response}")
             return None
         
 
