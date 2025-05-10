@@ -122,6 +122,12 @@ meta list
 # run cs using wine with open console https://www.youtube.com/watch?v=nHASZOPiLdY
 wine .wine/drive_c/Games/'Counter-strike 1.6 Original'/hl.exe -steam -game cstrike -appid 10 -noipx -nojoy -noforcemspd -noforcemparms -noforcemaccel
 
+#---------Running server indefinetely using screen-------------#
+screen -S cs-server
+./hlds_run ......
+Ctrl-a d # detach
+screen -r cs-server             # to attach to screen session later
+
 # -----client console------------
 connect <IP>:27015                    # should connect you to the server
 
@@ -198,3 +204,5 @@ sv_lan 0
 sv_consistency 0
 rcon_password "e2b"
 EOF
+
+
