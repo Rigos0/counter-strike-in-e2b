@@ -39,14 +39,14 @@ class OpenAIModel(BaseModel):
         self.client = OpenAI(api_key=openai_api_key)
         self.tools = tools
 
-    def complete(self, messages: List):
+    def complete(self, user_messages: List):
         """
         Sends a conversation to the OpenAI API and processes responses,
         including tool calls when required.
         """
         response = self.client.chat.completions.create(
             model=self.model,
-            messages=messages,
+            messages=user_messages,
             tools=[tool.function_schema for tool in self.tools.values()],
             tool_choice="auto"
         )
@@ -114,14 +114,14 @@ class BaseOpenRouterModel(BaseModel):
                              api_key=open_router_api_key)
         
 
-    def complete(self, messages: List):
+    def complete(self, user_messages: List):
         # Don't include the system message here.
         # Image should be provided to locate the enemy.
 
         response = self.client.chat.completions.create(
             model= self.model,
             temperature=self.temperature,
-            messages=messages,
+            messages=user_messages,
         )
 
         if not response.id:
@@ -131,7 +131,20 @@ class BaseOpenRouterModel(BaseModel):
         response_message = response.choices[0].message
 
         return response_message.content, response
+    
 
+class OpenRouterGameplayModel(OpenAIModel):
+    "Uses tools"
+    def __init__(self, 
+                 tools: Dict[str, BaseTool] = {},
+                 model: str = "qwen/qwen2.5-vl-3b-instruct:free"):
+
+        self.model = model
+        open_router_api_key = os.environ.get("OPENROUTER_API_KEY")
+        self.client = OpenAI(base_url="https://openrouter.ai/api/v1",
+                             api_key=open_router_api_key)
+        self.tools = tools
+            
 
 class AimingModel(BaseOpenRouterModel):
     # Only the Qwen2.5 VL models support grounding
@@ -270,14 +283,13 @@ class GeminiAimingModel(AimingModel):
 
     # TODO: Gemini coordinates need to be descaled.
     # see: https://ai.google.dev/gemini-api/docs/image-understanding#bbox
-    def complete(self, messages: List):
+    def complete(self, user_messages: List):
         # Don't include the system message here.
         # Image should be provided to locate the enemy.
 
-        messages.insert(0, self.system_message)
         response = self.client.chat.completions.create(
             model=self.model,
-            messages=messages,
+            messages=user_messages,
         )
 
         print(response)
