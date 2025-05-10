@@ -191,10 +191,7 @@ class AimingModel(BaseOpenRouterModel):
         if model not in self.ALLOWED_MODELS:
             raise ValueError(f"Model '{model}' can't be used for aiming. Allowed models are: {self.ALLOWED_MODELS}")
         
-        print(self.MODELS_ORDERED)
-        print(model)
         self.fallback_models = [m for m in self.MODELS_ORDERED if m != model]
-        print(self.fallback_models)
 
         super().__init__(model=model)
         self.system_message = system_message
@@ -248,6 +245,9 @@ class AimingModel(BaseOpenRouterModel):
             else:
                 data = model_response
 
+            if cleaned.lower().startswith("n"): # None or Null returned by model
+                return None
+
             point = data.get("point", {})
             x = point.get("x")
             y = point.get("y")
@@ -261,9 +261,7 @@ class AimingModel(BaseOpenRouterModel):
             }
 
         except Exception as e:
-            print("Model did not adhere to the aiming structure.")
-            print("Error:", str(e))
-            print("Model response:", model_response)
+            print(f"Model did not adhere to the aiming structure. Response: {model_response}")
             return None
         
 
