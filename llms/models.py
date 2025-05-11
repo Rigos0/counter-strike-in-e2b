@@ -30,12 +30,13 @@ class OpenAIModel(BaseModel):
     """
     def __init__(self, 
                  tools: Dict[str, BaseTool] = {},
-                 model: str="gpt-4o"):
+                 model: str="gpt-4o",
+                 api_key_name: str = "OPEN_AI_KEY"):
         
         self.model = model
         self.default_image_quality = "low"
 
-        openai_api_key = os.environ.get("OPEN_AI_KEY")
+        openai_api_key = os.environ.get(api_key_name)
         self.client = OpenAI(api_key=openai_api_key)
         self.tools = tools
 
@@ -159,12 +160,23 @@ class OpenRouterGameplayModel(OpenAIModel):
     "Uses tools"
     def __init__(self, 
                  tools: Dict[str, BaseTool] = {},
-                 model: str = "qwen/qwen2.5-vl-3b-instruct:free",
+                 model: str = "google/gemini-2.5-flash-preview",
                  api_key_name: str = "OPENROUTER_API_KEY"
                  ):
 
         super().__init__(model=model,
                          api_key_name=api_key_name)
+        self.tools = tools
+
+    def __init__(self, 
+                 tools: Dict[str, BaseTool] = {},
+                 model: str = "qwen/qwen2.5-vl-3b-instruct:free",
+                 api_key_name: str = "OPENROUTER_API_KEY"):
+        
+        self.model = model
+        open_router_api_key = os.environ.get("OPENROUTER_API_KEY")
+        self.client = OpenAI(base_url=api_key_name,
+                             api_key=open_router_api_key)
         self.tools = tools
 
 
@@ -191,7 +203,6 @@ class OpenRouterGameplayModel(OpenAIModel):
         return response_message.content, response, tool_calls
         
         
-            
 
 class AimingModel(BaseOpenRouterModel):
     # Only the Qwen2.5 VL models support grounding
