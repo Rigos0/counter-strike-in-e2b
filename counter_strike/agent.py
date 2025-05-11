@@ -9,9 +9,32 @@ from e2b_desktop import Sandbox
 from llms.models import OpenRouterGameplayModel, AimingModel
 
 from .controls import aim, shoot
-
 from .image_handling import draw_point, get_screenshot_message, get_mouse_movements
 from .image_logging import ImageLoggingSettings
+from .prompts import T_AIMING_PROMPT, CT_AIMING_PROMPT
+
+
+class AgentSettings:
+    def __init__(self,
+                 side: str,
+                 open_router_api_key_name: str = "OPENROUTER_API_KEY",
+                 wait_on_start: int = 0
+                 ):
+        """
+        :param side: 'CT' or 'T'
+        """
+        
+        self.open_router_key_name = open_router_api_key_name
+        if side == "CT":
+            self.aiming_system_prompt = CT_AIMING_PROMPT
+            self.team_choice = "2"
+            self.skin_choice = "3"
+        elif side == "T":
+            self.aiming_system_prompt = T_AIMING_PROMPT
+            self.team_choice = "1"
+            self.skin_choice = "4"
+        else:
+            raise ValueError("Please choose a valid side from ['CT', 'T'].")
 
 
 def run_model_async(executor, model, message):
@@ -120,7 +143,7 @@ def run_agent(aiming_model: AimingModel,
               desktop: Sandbox, 
               iterations:int =10):
     
-    image_logger = ImageLoggingSettings()
+    image_logger = ImageLoggingSettings(base_path="images")
 
     for i in range(iterations):
         print(f"\n--- Iteration {i + 1} ---")
