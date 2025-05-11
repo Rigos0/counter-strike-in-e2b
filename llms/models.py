@@ -100,10 +100,12 @@ class GroqModel(OpenAIModel):
 class BaseOpenRouterModel(BaseModel):
     "No tools" 
     def __init__(self, 
-                 model: str = "qwen/qwen2.5-vl-3b-instruct:free"):
+                 model: str = "qwen/qwen2.5-vl-3b-instruct:free",
+                 api_key_name: str = "OPENROUTER_API_KEY"
+                 ):
 
         self.model = model
-        open_router_api_key = os.environ.get("OPENROUTER_API_KEY")
+        open_router_api_key = os.environ.get(api_key_name)
         self.client = OpenAI(base_url="https://openrouter.ai/api/v1",
                              api_key=open_router_api_key)
         
@@ -157,12 +159,12 @@ class OpenRouterGameplayModel(OpenAIModel):
     "Uses tools"
     def __init__(self, 
                  tools: Dict[str, BaseTool] = {},
-                 model: str = "qwen/qwen2.5-vl-3b-instruct:free"):
+                 model: str = "qwen/qwen2.5-vl-3b-instruct:free",
+                 api_key_name: str = "OPENROUTER_API_KEY"
+                 ):
 
-        self.model = model
-        open_router_api_key = os.environ.get("OPENROUTER_API_KEY")
-        self.client = OpenAI(base_url="https://openrouter.ai/api/v1",
-                             api_key=open_router_api_key)
+        super().__init__(model=model,
+                         api_key_name=api_key_name)
         self.tools = tools
 
 
@@ -217,7 +219,7 @@ class AimingModel(BaseOpenRouterModel):
     ensure_ascii=False
     )
 
-    system_message = {
+    DEFAULT_SYSTEM_MESSAGE = {
             "role": "system",
             "content": f"""As an intelligent robot, your job is to locate the nearest person. Locate the middle of his body. Output JSON containing the point.
             Important: Don't provide any reasoning, only JSON.
@@ -230,15 +232,17 @@ class AimingModel(BaseOpenRouterModel):
 
     def __init__(self, 
                  model: str = "qwen/qwen2.5-vl-32b-instruct",
-                 system_message = system_message,
-                 temperature: Optional[float | None] = None):
+                 system_message: Dict = DEFAULT_SYSTEM_MESSAGE,
+                 temperature: Optional[float | None] = None,
+                 api_key_name: str = "OPENROUTER_API_KEY"):
 
         if model not in self.ALLOWED_MODELS:
             raise ValueError(f"Model '{model}' can't be used for aiming. Allowed models are: {self.ALLOWED_MODELS}")
         
         self.fallback_models = [m for m in self.MODELS_ORDERED if m != model]
 
-        super().__init__(model=model)
+        super().__init__(model=model,
+                         api_key_name=api_key_name)
         self.system_message = system_message
         self.temperature = temperature
 
