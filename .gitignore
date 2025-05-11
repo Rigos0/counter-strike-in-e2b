@@ -7,3 +7,5 @@ server-key
 
 nbs/test.py
 *.jpg
+
+tests
