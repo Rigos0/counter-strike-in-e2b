@@ -6,6 +6,9 @@ open-computer-use
 server-key
 
 nbs/test.py
+nbs/llm_speed_test.ipynb
+nbs/test_steps.ipynb
+nbs/vision_model_testing.ipynb
 *.jpg
 
 tests

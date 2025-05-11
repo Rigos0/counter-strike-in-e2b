@@ -57,7 +57,9 @@ def connect_to_server(desktop: "Sandbox", ip_address: str):
     for i in range(5):
         desktop.wait(30_000)
 
-def choose_team(desktop: "Sandbox", team_option: str = "1", skin: str = "4"):
+def choose_team(desktop: "Sandbox",
+                team_option: str = "1",
+                skin: str = "4"):
     # Team: 1=T, 2=CT, 6=SPECTATE
     # Skin: T side: Guerilla warfare skin because they have the red headband
     desktop.press("enter")

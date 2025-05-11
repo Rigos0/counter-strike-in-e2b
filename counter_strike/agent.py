@@ -141,9 +141,10 @@ def decide_and_act(coords, tool_calls, gameplay_time, desktop, image_logger, gam
 def run_agent(aiming_model: AimingModel,
               gameplay_model: OpenRouterGameplayModel, 
               desktop: Sandbox, 
-              iterations:int =10):
+              iterations:int =10,
+              image_logging_path: str = "images"):
     
-    image_logger = ImageLoggingSettings(base_path="images")
+    image_logger = ImageLoggingSettings(base_path=image_logging_path)
 
     for i in range(iterations):
         print(f"\n--- Iteration {i + 1} ---")

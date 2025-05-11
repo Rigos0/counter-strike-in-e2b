@@ -30,7 +30,7 @@ class MoveTool(BaseTool):
                 "properties": {
                     "key_sequence": {
                         "type": "string",
-                        "description": "A string consisting of 5 characters. Each character must be one of 'w' (forward), 'a' (strafe left), 's' (backward), or 'd' (strafe right). Example: 'wwaa' will move forward and left."
+                        "description": "A string consisting of 5 characters. Each character must be one of 'w' (forward), 'a' (strafe left), 's' (backward), 'd' (strafe right), 'r' (turn right), or 'l' (turn left). Example: 'wwraa' will move forward twice, turn right and strafe left twice."
                     }
                 },
                 "required": ["key_sequence"]
@@ -40,11 +40,24 @@ class MoveTool(BaseTool):
 
     def __init__(self, desktop: "Sandbox"):
         self.desktop = desktop
+
+    def execute_turning(self, direction: str):
+        if direction == "r":     
+            self.desktop.move_mouse(1380, 540) # keep y constant
+        if direction == "l":                  # 960 would be the middle for x. We are moving 320 pixels
+            self.desktop.move_mouse(540, 540) 
     
     def execute(self, key_sequence: str):
         sequence_to_write = ""
         for action in key_sequence:
-            sequence_to_write += action * 10
+            if (action == "r") or (action == "l"):
+                if sequence_to_write != "": 
+                    self.desktop.write(sequence_to_write) # execute the actions before turning
+                    sequence_to_write = ""
+
+                self.execute_turning(action)
+            else:
+                sequence_to_write += action * 10
 
         # print(f"moving with key sequence: {key_sequence}")
         # print(sequence_to_write)
