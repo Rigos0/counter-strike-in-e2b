@@ -161,21 +161,11 @@ class OpenRouterGameplayModel(OpenAIModel):
     def __init__(self, 
                  tools: Dict[str, BaseTool] = {},
                  model: str = "google/gemini-2.5-flash-preview",
-                 api_key_name: str = "OPENROUTER_API_KEY"
-                 ):
-
-        super().__init__(model=model,
-                         api_key_name=api_key_name)
-        self.tools = tools
-
-    def __init__(self, 
-                 tools: Dict[str, BaseTool] = {},
-                 model: str = "qwen/qwen2.5-vl-3b-instruct:free",
                  api_key_name: str = "OPENROUTER_API_KEY"):
         
         self.model = model
-        open_router_api_key = os.environ.get("OPENROUTER_API_KEY")
-        self.client = OpenAI(base_url=api_key_name,
+        open_router_api_key = os.environ.get(api_key_name)
+        self.client = OpenAI(base_url="https://openrouter.ai/api/v1",
                              api_key=open_router_api_key)
         self.tools = tools
 
