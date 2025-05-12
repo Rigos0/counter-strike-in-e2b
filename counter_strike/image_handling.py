@@ -2,6 +2,7 @@ import base64
 from e2b_desktop import Sandbox
 from PIL import Image, ImageDraw, ImageFont
 from typing import Dict, List, Tuple
+import io
 from io import BytesIO
 
 
@@ -41,8 +42,7 @@ def get_screenshot(desktop, filename="screenshot.jpg", quality: int = None) -> s
 
     return base64.b64encode(raw_bytes).decode("utf-8")
 
-def get_screenshot_message(desktop: Sandbox, filename: str | None = None, quality: int = None):
-    base64_image = get_screenshot(desktop, filename=filename, quality=quality)
+def get_screenshot_message_from_base64(base64_image):
     return [
         {
             "role": "user",
@@ -55,6 +55,11 @@ def get_screenshot_message(desktop: Sandbox, filename: str | None = None, qualit
                 },
             ], }
     ]
+
+def get_screenshot_message(desktop: Sandbox, filename: str | None = None, quality: int = None):
+    base64_image = get_screenshot(desktop, filename=filename, quality=quality)
+    screenshot_message = get_screenshot_message_from_base64(base64_image)
+    return screenshot_message, base64_image
 
 def draw_point(point, image_path, output_path,
                marker_radius=5, marker_color='red'):
@@ -224,3 +229,79 @@ def get_mouse_movements(coords: Dict[str, float]):
     )
 
     return planned_movements
+
+RESAMPLE_METHOD = Image.Resampling.LANCZOS
+
+def compress_and_scale_base64_image(base64_string, target_size_percentage=50, scale_percentage=50):
+    if not base64_string: return None
+    # Ensure percentages are within a valid range for the operation's intent
+    if not (1 <= target_size_percentage <= 100): return None
+    if not (1 <= scale_percentage <= 100): return None
+
+    img_data = base64.b64decode(base64_string)
+    original_size_bytes = len(img_data)
+    target_size_bytes = original_size_bytes * target_size_percentage / 100
+
+    img = Image.open(io.BytesIO(img_data))
+    original_width, original_height = img.size
+
+    if scale_percentage < 100:
+        new_width = max(1, int(original_width * scale_percentage / 100))
+        new_height = max(1, int(original_height * scale_percentage / 100))
+        if (new_width, new_height) != (original_width, original_height):
+             img = img.resize((new_width, new_height), RESAMPLE_METHOD)
+
+    if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
+        background = Image.new('RGB', img.size, (255, 255, 255))
+        converted_img = img.convert('RGBA')
+        if converted_img.mode == 'RGBA':
+             mask = converted_img.split()[-1]
+             background.paste(converted_img, (0, 0), mask=mask)
+             img = background
+        else:
+             img = img.convert('RGB')
+    elif img.mode != 'RGB':
+        img = img.convert('RGB')
+
+    buffer_q95 = io.BytesIO()
+    img.save(buffer_q95, format="JPEG", quality=95, optimize=True)
+    data_q95 = buffer_q95.getvalue()
+
+    if target_size_percentage == 100:
+         return base64.b64encode(data_q95).decode('utf-8')
+
+    if len(data_q95) <= target_size_bytes:
+        return base64.b64encode(data_q95).decode('utf-8')
+
+    best_data_under_target = None
+    lowest_quality_data = None
+
+    buffer_q1 = io.BytesIO()
+    img.save(buffer_q1, format="JPEG", quality=1, optimize=True)
+    lowest_quality_data = buffer_q1.getvalue()
+
+    quality_min, quality_max = 1, 95
+    for _ in range(8):
+        if quality_min > quality_max: break
+
+        current_quality = (quality_min + quality_max) // 2
+        if current_quality < 1: current_quality = 1
+
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=current_quality, optimize=True)
+        current_data = buffer.getvalue()
+        current_size = len(current_data)
+
+        if current_size <= target_size_bytes:
+            best_data_under_target = current_data
+            quality_min = current_quality + 1
+        else:
+            quality_max = current_quality - 1
+
+    if best_data_under_target is not None:
+        final_data = best_data_under_target
+    else:
+        final_data = lowest_quality_data
+
+    final_base64 = base64.b64encode(final_data).decode('utf-8')
+    return final_base64

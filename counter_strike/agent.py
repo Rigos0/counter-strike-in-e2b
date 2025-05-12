@@ -5,11 +5,15 @@ run_agent() is the main function which is getting imported from here
 import concurrent.futures
 import time 
 from e2b_desktop import Sandbox
+import collections
+import copy
+from typing import List, Dict
 
 from llms.models import OpenRouterGameplayModel, AimingModel
 
 from .controls import aim, shoot
-from .image_handling import draw_point, get_screenshot_message, get_mouse_movements
+from .image_handling import draw_point, get_screenshot_message, get_screenshot_message_from_base64, \
+    get_mouse_movements, compress_and_scale_base64_image
 from .image_logging import ImageLoggingSettings
 from .prompts import T_AIMING_PROMPT, CT_AIMING_PROMPT
 
@@ -35,6 +39,60 @@ class AgentSettings:
             self.skin_choice = "4"
         else:
             raise ValueError("Please choose a valid side from ['CT', 'T'].")
+        
+        
+class AgentMemory:
+    def __init__(self, max_iterations=3):
+        self.iterations = collections.deque(maxlen=max_iterations)
+
+    def add_iteration(self, action_message: List[Dict], screenshot_message: List[Dict]):
+        new_iteration = [action_message, screenshot_message]
+        self.iterations.append(new_iteration)
+
+    def get_memory_as_messages(self):
+        all_messages = []
+        for iteration in self.iterations:
+            action_messages, screenshot_messages = iteration
+            all_messages.extend(action_messages)
+            all_messages.extend(screenshot_messages)
+        return all_messages
+
+    def print_memory(self):
+        """
+        A mess since we can't print a base64 image
+        """
+        print("\n\n\n")
+        for i, iteration in enumerate(list(self.iterations)):
+            print(f"Iteration {i + 1} Messages (in current memory):")
+            for m in iteration:
+                message_to_print = copy.deepcopy(m)
+                content = message_to_print.get('content')
+
+                if isinstance(content, list):
+                    processed_content = []
+                    for item in content:
+                        if isinstance(item, dict) and item.get('type') == 'image_url':
+                            image_url_data = item.get('image_url', {})
+                            url = image_url_data.get('url', '')
+                            if isinstance(url, str) and 'base64,' in url:
+                                base64_start = url.find('base64,')
+                                if base64_start != -1:
+                                    modified_item = copy.deepcopy(item)
+                                    modified_item['image_url']['url'] = url[:base64_start + 7] + ' <BASE64_DATA_HIDDEN>'
+                                    processed_content.append(modified_item)
+                                else:
+                                     processed_content.append(item)
+                            else:
+                                processed_content.append(item)
+                        else:
+                            processed_content.append(item)
+                    message_to_print['content'] = processed_content
+                elif isinstance(content, str) and 'base64,' in content:
+                     base64_start = content.find('base64,')
+                     if base64_start != -1:
+                           message_to_print['content'] = content[:base64_start + 7] + ' <BASE64_DATA_HIDDEN>'
+
+                print(message_to_print)
 
 
 def run_model_async(executor, model, message):
@@ -114,24 +172,29 @@ def handle_gameplay_actions(tool_calls, gameplay_model_instance): # Added gamepl
 def capture_screenshot(desktop, image_logger):
     start_time = time.perf_counter()
     screenshot_path = image_logger.generate_new_paths_for_iteration()
-    screenshot_message = get_screenshot_message(desktop, filename=screenshot_path)
+    screenshot_message, base64_image = get_screenshot_message(desktop, filename=screenshot_path)
     elapsed_time = time.perf_counter() - start_time
     print(f"  [Time] Screenshot: {elapsed_time:.4f}s")
-    return screenshot_message
+    return screenshot_message, base64_image
 
+def get_action_message(action: str):
+    return {
+        "role": "assistant",
+        "content": action
+    }
 
 def decide_and_act(coords, tool_calls, gameplay_time, desktop, image_logger, gameplay_model):
     if coords:
         print(f"  [Action] Coords found: {coords}. Aiming & Shooting.")
         perform_aiming_sequence(coords, desktop, image_logger)
-        return "Aim & Shoot"
+        return f"Aim & Shoot. Coords: {coords}"
     
     if tool_calls:
         print(f"  [Action] No Coords. Using Gameplay Model Tool Calls.")
         if gameplay_time > 0:
             print(f"  [Time] Gameplay Model: {gameplay_time:.4f}s")
         handle_gameplay_actions(tool_calls, gameplay_model)
-        return f"Tool Calls: {tool_calls}"
+        return f"Tool Calls: {tool_calls.function.name}, Arguments: {tool_calls.function.arguments}"
     
     print(f"  [Action] No Coords, No Tool Calls.")
     if gameplay_time > 0:
@@ -145,15 +208,20 @@ def run_agent(aiming_model: AimingModel,
               image_logging_path: str = "images"):
     
     image_logger = ImageLoggingSettings(base_path=image_logging_path)
+    agent_memory = AgentMemory(max_iterations=2) 
 
     for i in range(iterations):
         print(f"\n--- Iteration {i + 1} ---")
+        context_messages = agent_memory.get_memory_as_messages()
+
         iteration_start = time.perf_counter()
 
-        screenshot_message = capture_screenshot(desktop, image_logger)
+        screenshot_message, base64_image = capture_screenshot(desktop, image_logger)
+
+        messages = context_messages + screenshot_message
 
         coords, tool_calls, aiming_time, gameplay_time = process_models_concurrently(
-            screenshot_message,
+            messages,
             aiming_model,
             gameplay_model
         )
@@ -166,3 +234,12 @@ def run_agent(aiming_model: AimingModel,
         iteration_end = time.perf_counter()
         print(f" Action taken: {action_taken}")
         print(f"  [Time] Iteration {i+1} Total: {iteration_end - iteration_start:.4f}s")
+
+        action_message = get_action_message(action_taken)
+        small_base64_image = compress_and_scale_base64_image(base64_image,
+                                                             target_size_percentage=50,
+                                                            scale_percentage=20)
+        compressed_image_message = get_screenshot_message_from_base64(small_base64_image)
+
+        agent_memory.add_iteration(action_message=action_message, screenshot_message=compressed_image_message)
+        # return action_message, compressed_image_message
