@@ -9,6 +9,8 @@ nbs/test.py
 nbs/llm_speed_test.ipynb
 nbs/test_steps.ipynb
 nbs/vision_model_testing.ipynb
+nbs/compress_image.ipynb
+
 *.jpg
 
 tests

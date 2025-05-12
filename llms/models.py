@@ -137,6 +137,7 @@ class OpenRouterGameplayModel(OpenAIModel):
             "role": "system",
             "content": (
                 "You are an AI agent in a Counter-Strike deathmatch simulation. "
+                "At the start of the round, the enemy is spawned on the other side of the map."
                 "All movement commands must be executed exclusively via the move_tool. "
                 "You may not return plain text for movement—every response must invoke the move_tool function with a valid key_sequence of exactly five characters (w/a/s/d)."
             )
@@ -149,10 +150,14 @@ class OpenRouterGameplayModel(OpenAIModel):
             "role": "user",
             "content": (
                 "Current map: aim_map_2010."
+                "You are provided with screenshots from your game ranking from the oldest to the current situation."
+                "You are also provided with your past actions."
                 "Design five consecutive movement steps to locate the enemy: "
+                "If you are stuck in a wall, consider taking steps back and turning. (sslll or ssrrr)"
+                "Otherwise, you prefer to push forwards."
                 "1) Choose a combined sequence of 5 keys (w/a/s/d) per move. "
                 "2) Return your answer by calling move_tool with the 'key_sequence' parameter. "
-                "Example: {\"name\": \"move_tool\", \"arguments\": {\"key_sequence\": \"wwaad\"}}"
+                "Example: {\"name\": \"move_tool\", \"arguments\": {\"key_sequence\": \"wwwwr\"}}"
             )
         }
     ]
@@ -251,7 +256,6 @@ class AimingModel(BaseOpenRouterModel):
     def complete(self, user_messages: List, debug: bool = False):
         # Don't include the system message as a parameter
         # Image should be provided to locate the enemy.
-
         messages = [self.system_message] + user_messages
         response = self.client.chat.completions.create(
             model= self.model,
@@ -265,6 +269,8 @@ class AimingModel(BaseOpenRouterModel):
             temperature=self.temperature,
             messages=messages,
         )
+
+        print(response)
 
         if debug: 
             print(response)

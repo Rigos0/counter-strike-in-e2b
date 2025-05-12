@@ -30,7 +30,9 @@ class MoveTool(BaseTool):
                 "properties": {
                     "key_sequence": {
                         "type": "string",
-                        "description": "A string consisting of 5 characters. Each character must be one of 'w' (forward), 'a' (strafe left), 's' (backward), 'd' (strafe right), 'r' (turn right), or 'l' (turn left). Example: 'wwraa' will move forward twice, turn right and strafe left twice."
+                        "description": "A string consisting of 5 characters. Each character must be one of"
+                        " 'w' (forward), 'a' (strafe left), 's' (backward), 'd' (strafe right), 'r' (turn right), or 'l' (turn left). "
+                        "Example: 'wwrww' will move you forward twice, turn right and move forward twice."
                     }
                 },
                 "required": ["key_sequence"]

@@ -22,17 +22,19 @@ class AgentSettings:
     def __init__(self,
                  side: str,
                  open_router_api_key_name: str = "OPENROUTER_API_KEY",
-                 wait_on_start: int = 0
+                 wait_on_start: int = 0,
+                 memory: int = 3
                  ):
         """
         :param side: 'CT' or 'T'
         """
         
         self.open_router_key_name = open_router_api_key_name
+        self.memory = memory
         if side == "CT":
             self.aiming_system_prompt = CT_AIMING_PROMPT
             self.team_choice = "2"
-            self.skin_choice = "3"
+            self.skin_choice = "2"
         elif side == "T":
             self.aiming_system_prompt = T_AIMING_PROMPT
             self.team_choice = "1"
@@ -253,11 +255,12 @@ def decide_and_act(coords, tool_calls, gameplay_time, desktop, image_logger, gam
 def run_agent(aiming_model: AimingModel,
               gameplay_model: OpenRouterGameplayModel, 
               desktop: Sandbox, 
+              memory_capacity: int = 3,
               iterations:int =10,
               image_logging_path: str = "images"):
     
     image_logger = ImageLoggingSettings(base_path=image_logging_path)
-    agent_memory = AgentMemory(max_iterations=4) 
+    agent_memory = AgentMemory(max_iterations=memory_capacity) 
 
     for i in range(iterations):
         print(f"\n--- Iteration {i + 1} ---")
