@@ -58,42 +58,24 @@ class AgentMemory:
         return all_messages
 
     def print_memory(self):
-        """
-        A mess since we can't print a base64 image
-        """
-        print("\n\n\n")
-        for i, iteration in enumerate(list(self.iterations)):
-            print(f"Iteration {i + 1} Messages (in current memory):")
-            for m in iteration:
-                message_to_print = copy.deepcopy(m)
-                content = message_to_print.get('content')
-
-                if isinstance(content, list):
-                    processed_content = []
-                    for item in content:
-                        if isinstance(item, dict) and item.get('type') == 'image_url':
-                            image_url_data = item.get('image_url', {})
-                            url = image_url_data.get('url', '')
-                            if isinstance(url, str) and 'base64,' in url:
-                                base64_start = url.find('base64,')
-                                if base64_start != -1:
-                                    modified_item = copy.deepcopy(item)
-                                    modified_item['image_url']['url'] = url[:base64_start + 7] + ' <BASE64_DATA_HIDDEN>'
-                                    processed_content.append(modified_item)
-                                else:
-                                     processed_content.append(item)
+        print("\nMemory:")
+        for i, iteration in enumerate(self.iterations):
+            print(f"Iteration {i + 1}")
+            for message_list in iteration:
+                # Ensure message_list is iterable (i.e., a list of dicts)
+                if isinstance(message_list, list):
+                    for message in message_list:
+                        if isinstance(message, dict):
+                            role = message.get('role', 'unknown')
+                            content = message.get('content')
+                            if isinstance(content, str) and 'base64,' in content:
+                                print(f"  {role}: [IMAGE]")
                             else:
-                                processed_content.append(item)
+                                print(f"  {role}: [MESSAGE]")
                         else:
-                            processed_content.append(item)
-                    message_to_print['content'] = processed_content
-                elif isinstance(content, str) and 'base64,' in content:
-                     base64_start = content.find('base64,')
-                     if base64_start != -1:
-                           message_to_print['content'] = content[:base64_start + 7] + ' <BASE64_DATA_HIDDEN>'
-
-                print(message_to_print)
-
+                            print("  [Invalid message format]")
+                else:
+                    print("  [Invalid message list format]")
 
 def run_model_async(executor, model, message):
     return executor.submit(model.complete, user_messages=message)
@@ -129,14 +111,15 @@ def handle_gameplay_model_response(future_gameplay, coords_found):
     return tool_calls_output, gameplay_model_time
 
 
-def process_models_concurrently(screenshot_message, aiming_model, gameplay_model):
+def process_models_concurrently(context_messages: List[Dict], screenshot_message: List[Dict], aiming_model, gameplay_model):
     """
     Runs aiming and gameplay models concurrently, prioritizing aiming results.
     Returns coordinates if found, otherwise tool_calls from gameplay.
     """
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_aiming = run_model_async(executor, aiming_model, screenshot_message)
-        future_gameplay = run_model_async(executor, gameplay_model, screenshot_message)
+        messages_with_context = context_messages + screenshot_message
+        future_gameplay = run_model_async(executor, gameplay_model, messages_with_context)
 
         coords, aiming_model_time = get_aiming_result(future_aiming, aiming_model)
         tool_calls_output, gameplay_model_time = handle_gameplay_model_response(future_gameplay, coords)
@@ -177,11 +160,11 @@ def capture_screenshot(desktop, image_logger):
     print(f"  [Time] Screenshot: {elapsed_time:.4f}s")
     return screenshot_message, base64_image
 
-def get_action_message(action: str):
-    return {
+def get_action_message(action: str) -> List[Dict]:
+    return [{
         "role": "assistant",
         "content": action
-    }
+    }]
 
 def decide_and_act(coords, tool_calls, gameplay_time, desktop, image_logger, gameplay_model):
     if coords:
@@ -194,7 +177,7 @@ def decide_and_act(coords, tool_calls, gameplay_time, desktop, image_logger, gam
         if gameplay_time > 0:
             print(f"  [Time] Gameplay Model: {gameplay_time:.4f}s")
         handle_gameplay_actions(tool_calls, gameplay_model)
-        return f"Tool Calls: {tool_calls.function.name}, Arguments: {tool_calls.function.arguments}"
+        return f"Tool Calls: {tool_calls[0].function.name}, Arguments: {tool_calls[0].function.arguments}"
     
     print(f"  [Action] No Coords, No Tool Calls.")
     if gameplay_time > 0:
@@ -212,18 +195,16 @@ def run_agent(aiming_model: AimingModel,
 
     for i in range(iterations):
         print(f"\n--- Iteration {i + 1} ---")
-        context_messages = agent_memory.get_memory_as_messages()
-
         iteration_start = time.perf_counter()
 
+        context_messages = agent_memory.get_memory_as_messages()
         screenshot_message, base64_image = capture_screenshot(desktop, image_logger)
 
-        messages = context_messages + screenshot_message
-
         coords, tool_calls, aiming_time, gameplay_time = process_models_concurrently(
-            messages,
+            context_messages,
+            screenshot_message,
             aiming_model,
-            gameplay_model
+            gameplay_model,
         )
         print(f"  [Time] Aiming Model: {aiming_time:.4f}s")
 
@@ -242,4 +223,6 @@ def run_agent(aiming_model: AimingModel,
         compressed_image_message = get_screenshot_message_from_base64(small_base64_image)
 
         agent_memory.add_iteration(action_message=action_message, screenshot_message=compressed_image_message)
-        # return action_message, compressed_image_message
+        agent_memory.print_memory()
+
+    return agent_memory
