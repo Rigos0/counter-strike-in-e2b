@@ -42,40 +42,55 @@ class AgentSettings:
         
         
 class AgentMemory:
-    def __init__(self, max_iterations=3):
+    def __init__(self, max_iterations: int = 3):
+        # retain up to `max_iterations` of (actions, screenshots) pairs
         self.iterations = collections.deque(maxlen=max_iterations)
 
-    def add_iteration(self, action_message: List[Dict], screenshot_message: List[Dict]):
-        new_iteration = [action_message, screenshot_message]
-        self.iterations.append(new_iteration)
+    def add_iteration(
+        self,
+        action_message: List[Dict],
+        screenshot_message: List[Dict]
+    ):
+        """
+        action_message: e.g. [{'role': 'assistant', 'content': 'No Action'}]
+        screenshot_message: e.g. [{
+            'role': 'user',
+            'content': [
+                {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,...'}}
+            ]
+        }]
+        """
+        self.iterations.append((action_message, screenshot_message))
 
-    def get_memory_as_messages(self):
-        all_messages = []
-        for iteration in self.iterations:
-            action_messages, screenshot_messages = iteration
-            all_messages.extend(action_messages)
-            all_messages.extend(screenshot_messages)
-        return all_messages
+    def get_action_memory(self) -> List[Dict]:
+        """
+        Returns a flat list of all action messages in memory,
+        in the same shape they were added.
+        """
+        actions: List[Dict] = []
+        for action_msgs, _ in self.iterations:
+            actions.extend(action_msgs)
+        return actions
 
-    def print_memory(self):
-        print("\nMemory:")
-        for i, iteration in enumerate(self.iterations):
-            print(f"Iteration {i + 1}")
-            for message_list in iteration:
-                # Ensure message_list is iterable (i.e., a list of dicts)
-                if isinstance(message_list, list):
-                    for message in message_list:
-                        if isinstance(message, dict):
-                            role = message.get('role', 'unknown')
-                            content = message.get('content')
-                            if isinstance(content, str) and 'base64,' in content:
-                                print(f"  {role}: [IMAGE]")
-                            else:
-                                print(f"  {role}: [MESSAGE]")
-                        else:
-                            print("  [Invalid message format]")
-                else:
-                    print("  [Invalid message list format]")
+    def get_image_memory(self) -> List[Dict]:
+        """
+        Returns a flat list of image-url dicts only, 
+        e.g. [
+            {'type': 'image_url', 'image_url': {'url': 'data:image/...'}},
+            ...
+        ]
+        """
+        images: List[Dict] = []
+        for _, screenshot_msgs in self.iterations:
+            for msg in screenshot_msgs:
+                # msg['content'] is a list of image dicts
+                content = msg.get('content', [])
+                if isinstance(content, list):
+                    for img in content:
+                        # optionally validate img['type'] == 'image_url'
+                        images.append(img)
+        return images
+
 
 def run_model_async(executor, model, message):
     return executor.submit(model.complete, user_messages=message)
@@ -111,14 +126,65 @@ def handle_gameplay_model_response(future_gameplay, coords_found):
     return tool_calls_output, gameplay_model_time
 
 
-def process_models_concurrently(context_messages: List[Dict], screenshot_message: List[Dict], aiming_model, gameplay_model):
+def combine_screenshot_message_with_image_history(
+    image_history_messages: List[Dict],
+    screenshot_message: List[Dict]
+) -> List[Dict]:
+    """
+    Prepends the list of image-history dicts to each screenshot message's content.
+
+    Args:
+        image_history_messages: List of image_url dicts, e.g.
+            [
+                {'type': 'image_url', 'image_url': {'url': 'data:image/...'}},
+                ...
+            ]
+        screenshot_message: List of messages of the form:
+            [
+                {
+                    'role': 'user',
+                    'content': [
+                        {'type': 'image_url', 'image_url': {'url': 'data:image/...'}},
+                        ...
+                    ]
+                },
+                ...
+            ]
+
+    Returns:
+        A new list of screenshot messages where each message's "content"
+        list has image_history_messages prepended.
+    """
+    combined_messages: List[Dict] = []
+
+    for msg in screenshot_message:
+        new_msg = msg.copy()
+        original_content = new_msg.get('content', [])
+        if isinstance(original_content, list):
+            new_msg['content'] = image_history_messages + original_content
+        else:
+            new_msg['content'] = image_history_messages + [original_content]
+        combined_messages.append(new_msg)
+
+    return combined_messages
+    
+
+
+def process_models_concurrently(action_messages: List[Dict],
+                                image_history_messages,
+                                screenshot_message: List[Dict],
+                                aiming_model,
+                                gameplay_model):
     """
     Runs aiming and gameplay models concurrently, prioritizing aiming results.
     Returns coordinates if found, otherwise tool_calls from gameplay.
     """
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_aiming = run_model_async(executor, aiming_model, screenshot_message)
-        messages_with_context = context_messages + screenshot_message
+
+        screenshot_message_with_image_history = combine_screenshot_message_with_image_history(image_history_messages,
+                                                                                              screenshot_message=screenshot_message)
+        messages_with_context = action_messages + screenshot_message_with_image_history
         future_gameplay = run_model_async(executor, gameplay_model, messages_with_context)
 
         coords, aiming_model_time = get_aiming_result(future_aiming, aiming_model)
@@ -177,7 +243,7 @@ def decide_and_act(coords, tool_calls, gameplay_time, desktop, image_logger, gam
         if gameplay_time > 0:
             print(f"  [Time] Gameplay Model: {gameplay_time:.4f}s")
         handle_gameplay_actions(tool_calls, gameplay_model)
-        return f"Tool Calls: {tool_calls[0].function.name}, Arguments: {tool_calls[0].function.arguments}"
+        return f"Action taken {tool_calls[0].function.name}, with the sequence: {tool_calls[0].function.arguments}"
     
     print(f"  [Action] No Coords, No Tool Calls.")
     if gameplay_time > 0:
@@ -191,20 +257,22 @@ def run_agent(aiming_model: AimingModel,
               image_logging_path: str = "images"):
     
     image_logger = ImageLoggingSettings(base_path=image_logging_path)
-    agent_memory = AgentMemory(max_iterations=2) 
+    agent_memory = AgentMemory(max_iterations=4) 
 
     for i in range(iterations):
         print(f"\n--- Iteration {i + 1} ---")
         iteration_start = time.perf_counter()
 
-        context_messages = agent_memory.get_memory_as_messages()
+        action_history = agent_memory.get_action_memory()
+        image_history = agent_memory.get_image_memory()
         screenshot_message, base64_image = capture_screenshot(desktop, image_logger)
 
         coords, tool_calls, aiming_time, gameplay_time = process_models_concurrently(
-            context_messages,
-            screenshot_message,
-            aiming_model,
-            gameplay_model,
+            action_messages=action_history,
+            image_history_messages=image_history,
+            screenshot_message=screenshot_message,
+            aiming_model=aiming_model,
+            gameplay_model=gameplay_model,
         )
         print(f"  [Time] Aiming Model: {aiming_time:.4f}s")
 
@@ -223,6 +291,5 @@ def run_agent(aiming_model: AimingModel,
         compressed_image_message = get_screenshot_message_from_base64(small_base64_image)
 
         agent_memory.add_iteration(action_message=action_message, screenshot_message=compressed_image_message)
-        agent_memory.print_memory()
 
     return agent_memory
