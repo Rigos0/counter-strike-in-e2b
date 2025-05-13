@@ -29,7 +29,7 @@ print(url_view)
         
 agent_setting = AgentSettings(
     side = "CT",
-    memory=3, # remember three images from the past
+    memory=4, # remember three images from the past
     open_router_api_key_name="OPENROUTER_API_KEY"
 )
 
@@ -56,4 +56,4 @@ if __name__=="__main__":
               gameplay_model=gameplay_model,
               desktop=desktop,
               memory_capacity=agent_setting.memory,
-              iterations=20) # For demonstration 
+              iterations=50) # For demonstration 
