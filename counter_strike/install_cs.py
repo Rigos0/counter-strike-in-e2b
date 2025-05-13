@@ -13,9 +13,9 @@ def install_cs_1_6(desktop: Sandbox):
     except CommandExitException:
         pass
     desktop.open("https://drive.google.com/u/0/uc?id=1TIsvGACSrQOr1tgPaVpJebH375LjLIV6&export=download")
-    desktop.wait(ms=4000)
+    desktop.wait(ms=5000)
     desktop.left_click(460, 305) #click the Download button
-    desktop.wait(ms=7000) 
+    desktop.wait(ms=10_000) 
     desktop.commands.run("unzip Downloads/Windows7DefaultFonts.zip -d Downloads") # couldnt find
     desktop.commands.run("mv Downloads/Windows7DefaultFonts/* ~/.wine/drive_c/windows/Fonts/")
     desktop.left_click(880, 1040) # open the terminal (I know, clean)
@@ -34,6 +34,7 @@ def install_cs_1_6(desktop: Sandbox):
     desktop.press("enter") # final install button
     desktop.wait(30000) # installation process
     desktop.wait(30000) # installation process
+    desktop.wait(5_000) # installation process
     desktop.press("enter") # LAUNCH
 
 
@@ -56,6 +57,7 @@ def connect_to_server(desktop: "Sandbox", ip_address: str):
     print("Waiting for 150 secs for map download...")
     for i in range(5):
         desktop.wait(30_000)
+    #desktop.wait(15_000) # just to make sure 
 
 def choose_team(desktop: "Sandbox",
                 team_option: str = "1",

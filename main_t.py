@@ -28,7 +28,7 @@ url_view = desktop.stream.get_url(view_only=True) # only viewing
 print(url_view)
         
 agent_setting = AgentSettings(
-    side = "CT",
+    side = "T",
     memory=4, # remember three images from the past
     open_router_api_key_name="OPENROUTER_API_KEY"
 )
@@ -41,8 +41,8 @@ move_tool = MoveTool(desktop=desktop)
 tools = {move_tool.name: move_tool}
 
 gameplay_model = OpenRouterGameplayModel(tools=tools, 
-                                         model="google/gemini-2.5-flash-preview",
-                                         #model="anthropic/claude-3.5-haiku:beta",
+                                         model="openai/gpt-4.1-mini",
+                                         #model="google/gemini-2.5-flash-preview",
                                          api_key_name=agent_setting.open_router_key_name)
 
 
@@ -57,4 +57,4 @@ if __name__=="__main__":
               gameplay_model=gameplay_model,
               desktop=desktop,
               memory_capacity=agent_setting.memory,
-              iterations=70) # For demonstration 
+              iterations=50) # For demonstration 

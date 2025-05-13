@@ -5,6 +5,7 @@ open-computer-use
 
 server-key
 
+nbs/main.ipynb
 nbs/test.py
 nbs/llm_speed_test.ipynb
 nbs/test_steps.ipynb
@@ -14,3 +15,4 @@ nbs/compress_image.ipynb
 *.jpg
 
 tests
+main_t

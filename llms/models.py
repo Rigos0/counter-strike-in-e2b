@@ -187,9 +187,9 @@ class OpenRouterGameplayModel(OpenAIModel):
         messages = self.SYSTEM_MESSAGE + user_messages + self.INSTRUCTION_MESSAGE
         response = self.client.chat.completions.create(
             model=self.model,
-            extra_body={
-                        "models": self.fallback_models
-            },
+            # extra_body={
+            #             "models": self.fallback_models
+            # },
             messages=messages,
             tools=[tool.function_schema for tool in self.tools.values()],
             tool_choice="auto"
